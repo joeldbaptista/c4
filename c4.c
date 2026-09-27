@@ -17,7 +17,7 @@
 // tokens and classes (operators last and in precedence order)
 enum {
 	Num = 128, Fun, Sys, Glo, Loc, Id,
-	Char, Else, Enum, If, Int, Return, Sizeof, While,
+	Char, Else, Enum, For, If, Int, Return, Sizeof, While,
 	Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge,
 	Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
 };
@@ -646,7 +646,7 @@ expr(int lev)
 void
 stmt()
 {
-	int *a, *b;
+	int *a, *b, *c, *d;
 
 	if (tk == If) {
 		next();
@@ -696,6 +696,58 @@ stmt()
 		*++e = JMP;
 		*++e = (int)a;
 		*b = (int)(e + 1);
+	} else if (tk == For) {
+		// The increment must run after the body, but it is parsed
+		// before it, and code is emitted as it is parsed. So the
+		// condition falls through to a jump across the increment,
+		// and the body jumps back to it.
+		next();
+		if (tk == '(') {
+			next();
+		} else {
+			printf("%d: open paren expected\n", line);
+			exit(-1);
+		}
+		if (tk != ';')
+			expr(Assign);
+		if (tk == ';') {
+			next();
+		} else {
+			printf("%d: semicolon expected\n", line);
+			exit(-1);
+		}
+		a = e + 1;
+		b = 0;
+		if (tk != ';') {
+			expr(Assign);
+			*++e = BZ;
+			b = ++e;
+		}
+		if (tk == ';') {
+			next();
+		} else {
+			printf("%d: semicolon expected\n", line);
+			exit(-1);
+		}
+		*++e = JMP;
+		c = ++e;
+		d = e + 1;
+		if (tk != ')')
+			expr(Assign);
+		*++e = JMP;
+		*++e = (int)a;
+		if (tk == ')') {
+			next();
+		} else {
+			printf("%d: close paren expected\n", line);
+			exit(-1);
+		}
+		*c = (int)(e + 1);
+		stmt();
+		*++e = JMP;
+		*++e = (int)d;
+		if (b)
+			*b = (int)(e + 1);
 	} else if (tk == Return) {
 		next();
 		if (tk != ';')
@@ -776,7 +828,7 @@ main(int argc, char **argv)
 	memset(e, 0, poolsz);
 	memset(data, 0, poolsz);
 
-	p = "char else enum if int return sizeof while "
+	p = "char else enum for if int return sizeof while "
 	    "open read close printf malloc free memset memcmp exit void main";
 
 	// add keywords to symbol table

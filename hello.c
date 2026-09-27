@@ -11,10 +11,7 @@ int main()
 {
 	int k;
 
-	k = 0;
-	while (k < 1000) {
+	for (k = 0; k < 1000; ++k)
 		foo(k);
-		++k;
-	}
 	return 0;
 }
