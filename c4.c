@@ -16,8 +16,8 @@
 
 // tokens and classes (operators last and in precedence order)
 enum {
-	Num = 128, Fun, Sys, Glo, Loc, Id,
-	Break, Char, Continue, Else, Enum, For, If, Int, Return,
+	Num = 128, Fun, Sys, Glo, Loc, Lab, Id,
+	Break, Char, Continue, Else, Enum, For, Goto, If, Int, Return,
 	Sizeof, While,
 	Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge,
 	Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
@@ -35,6 +35,8 @@ enum {
 enum { CHAR, INT, PTR };
 
 // identifier offsets (since we can't create an ident struct)
+// For a label, Val holds its address once known, and Type holds the
+// chain of gotos still waiting for that address.
 enum { Tk, Hash, Name, Class, Type, Val, HClass, HType, HVal, Idsz };
 
 char *p, *lp;   // current position in source code
@@ -652,6 +654,8 @@ stmt()
 	int *a, *b, *c, *d;    // patch sites for this statement
 	int *t;                // walks the break chain
 	int *ob, *oc;          // enclosing loop's break and continue
+	int j;                 // saved line, for the label lookahead
+	char *q, *ol;          // saved source position, same
 
 	if (tk == If) {
 		next();
@@ -818,6 +822,32 @@ stmt()
 			printf("%d: semicolon expected\n", line);
 			exit(-1);
 		}
+	} else if (tk == Goto) {
+		next();
+		if (tk != Id) {
+			printf("%d: bad label in goto\n", line);
+			exit(-1);
+		}
+		if (id[Class] && id[Class] != Lab) {
+			printf("%d: goto target is not a label\n", line);
+			exit(-1);
+		}
+		id[Class] = Lab;
+		*++e = JMP;
+		if (id[Val]) {
+			*++e = id[Val];
+		} else {
+			// the label is still ahead, so join its chain
+			*++e = id[Type];
+			id[Type] = (int)e;
+		}
+		next();
+		if (tk == ';') {
+			next();
+		} else {
+			printf("%d: semicolon expected\n", line);
+			exit(-1);
+		}
 	} else if (tk == '{') {
 		next();
 		while (tk != '}')
@@ -825,6 +855,50 @@ stmt()
 		next();
 	} else if (tk == ';') {
 		next();
+	} else if (tk == Id) {
+		// A label and an expression statement both begin with an
+		// identifier, so peek one token ahead, and put that token
+		// back when this turns out not to be a label.
+		d = id;
+		q = p;
+		j = line;
+		ol = lp;
+		next();
+		if (tk == ':') {
+			if (d[Class] && d[Class] != Lab) {
+				printf("%d: label name already in "
+				    "use\n", line);
+				exit(-1);
+			}
+			if (d[Val]) {
+				printf("%d: duplicate label\n", line);
+				exit(-1);
+			}
+			d[Class] = Lab;
+			d[Val] = (int)(e + 1);
+			// patch the gotos that ran ahead of this label
+			t = (int *)d[Type];
+			while (t) {
+				a = (int *)*t;
+				*t = d[Val];
+				t = a;
+			}
+			d[Type] = 0;
+			next();
+		} else {
+			p = q;
+			line = j;
+			lp = ol;
+			tk = Id;
+			id = d;
+			expr(Assign);
+			if (tk == ';') {
+				next();
+			} else {
+				printf("%d: semicolon expected\n", line);
+				exit(-1);
+			}
+		}
 	} else {
 		expr(Assign);
 		if (tk == ';') {
@@ -887,8 +961,8 @@ main(int argc, char **argv)
 	memset(e, 0, poolsz);
 	memset(data, 0, poolsz);
 
-	p = "break char continue else enum for if int return sizeof "
-	    "while "
+	p = "break char continue else enum for goto if int return "
+	    "sizeof while "
 	    "open read close printf malloc free memset memcmp exit void main";
 
 	// add keywords to symbol table
@@ -1079,6 +1153,15 @@ main(int argc, char **argv)
 						id[Class] = id[HClass];
 						id[Type] = id[HType];
 						id[Val] = id[HVal];
+					} else if (id[Class] == Lab) {
+						if (id[Type]) {
+							printf("%d: unde"
+							    "fined label\n",
+							    line);
+							return -1;
+						}
+						id[Class] = 0;
+						id[Val] = 0;
 					}
 					id = id + Idsz;
 				}

@@ -15,13 +15,18 @@ Build
 
     make
 
-This produces the `c4` binary. Other targets are `test`, `clean`, `install`
-and `uninstall`; that list is complete.
+This produces the `c4` binary. Other targets are `test`, `examples`,
+`clean`, `install` and `uninstall`; that list is complete.
 
     make test
 
 `make test` compiles `hello.c`, then compiles c4 with c4 and uses the result
 to compile `hello.c` again, then repeats that one level deeper.
+
+    make examples
+
+`make examples` runs every program in `examples/`, which is also where to
+look for what the subset can express. See `examples/README.md`.
 
 The build uses `-ffreestanding`. This is not an optimisation choice. `c4.c`
 contains `#define int long long`, so `main` does not have the signature a
@@ -74,20 +79,20 @@ The supported subset is small. The following list of features is complete:
 
 - Types `char`, `int`, `void`, and pointers to them.
 - `enum`, with optional explicit values.
-- `if`, `else`, `while`, `for`, `break`, `continue`, `return`, blocks,
-  expression statements, and the empty statement.
+- `if`, `else`, `while`, `for`, `break`, `continue`, `goto`, `return`,
+  labels, blocks, expression statements, and the empty statement.
 - The usual operators, including `? :`, `++`, `--`, `sizeof`, casts, and
   array subscripting.
 - Function definitions, including recursion.
 
 Everything else in C is absent. In particular this list of omissions covers
 the ones you are most likely to reach for first, although it is not
-exhaustive: `do`, `switch`, `goto`, `struct`, `union`, `typedef`, floating
-point, unsigned types, `static`, `const`, function prototypes, global
+exhaustive: `do`, `switch`, `struct`, `union`, `typedef`, floating point,
+unsigned types, `static`, `const`, function prototypes, global
 initialisers, and local declarations anywhere but the top of a function
 body.
 
-Five further restrictions are worth stating, because they are easy to trip
+Six further restrictions are worth stating, because they are easy to trip
 over:
 
 - There is no preprocessor. A `#` and the rest of its line are skipped, so
@@ -101,6 +106,9 @@ over:
 - `break` and `continue` apply to the innermost enclosing loop, and c4
   rejects them outside a loop. In a `for` loop, `continue` runs the
   increment before re-testing the condition.
+- A label is written `name:` and `goto` reaches only labels in the same
+  function. c4 keeps one namespace for identifiers, so a name is either
+  a label or a variable, never both.
 
 Nine library functions are available, and they are reached as opcodes rather
 than through a header: `open`, `read`, `close`, `printf`, `malloc`, `free`,
