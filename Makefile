@@ -22,9 +22,20 @@ $(BIN): $(SRC)
 
 # compile hello.c, then compile c4 with c4 and compile hello.c with that
 test: $(BIN)
-	./$(BIN) hello.c
-	./$(BIN) $(SRC) hello.c
-	./$(BIN) $(SRC) $(SRC) hello.c
+	./$(BIN) examples/hello.c
+	./$(BIN) $(SRC) examples/hello.c
+	./$(BIN) $(SRC) $(SRC) examples/hello.c
+
+# run every example; cat.c needs a file to print
+examples: $(BIN)
+	./$(BIN) examples/fizzbuzz.c
+	./$(BIN) examples/fib.c
+	./$(BIN) examples/control.c
+	./$(BIN) examples/primes.c
+	./$(BIN) examples/sort.c
+	./$(BIN) examples/strings.c
+	./$(BIN) examples/calc.c
+	./$(BIN) examples/cat.c examples/hello.c
 
 clean:
 	rm -f $(BIN)
@@ -37,4 +48,4 @@ install: all
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(BIN)
 
-.PHONY: all test clean install uninstall
+.PHONY: all test examples clean install uninstall
