@@ -74,20 +74,20 @@ The supported subset is small. The following list of features is complete:
 
 - Types `char`, `int`, `void`, and pointers to them.
 - `enum`, with optional explicit values.
-- `if`, `else`, `while`, `for`, `return`, blocks, expression statements,
-  and the empty statement.
+- `if`, `else`, `while`, `for`, `break`, `continue`, `return`, blocks,
+  expression statements, and the empty statement.
 - The usual operators, including `? :`, `++`, `--`, `sizeof`, casts, and
   array subscripting.
 - Function definitions, including recursion.
 
 Everything else in C is absent. In particular this list of omissions covers
 the ones you are most likely to reach for first, although it is not
-exhaustive: `do`, `switch`, `break`, `continue`, `goto`, `struct`,
-`union`, `typedef`, floating point, unsigned types, `static`, `const`,
-function prototypes, global initialisers, and local declarations anywhere
-but the top of a function body.
+exhaustive: `do`, `switch`, `goto`, `struct`, `union`, `typedef`, floating
+point, unsigned types, `static`, `const`, function prototypes, global
+initialisers, and local declarations anywhere but the top of a function
+body.
 
-Four further restrictions are worth stating, because they are easy to trip
+Five further restrictions are worth stating, because they are easy to trip
 over:
 
 - There is no preprocessor. A `#` and the rest of its line are skipped, so
@@ -97,7 +97,10 @@ over:
   escape yields the character after the backslash, so `\t` is `t`.
 - A `for` loop takes the three usual sections and any of them may be empty,
   but c4 has no comma operator, so each section holds one expression at
-  most. There is no `break` and no `continue`.
+  most.
+- `break` and `continue` apply to the innermost enclosing loop, and c4
+  rejects them outside a loop. In a `for` loop, `continue` runs the
+  increment before re-testing the condition.
 
 Nine library functions are available, and they are reached as opcodes rather
 than through a header: `open`, `read`, `close`, `printf`, `malloc`, `free`,

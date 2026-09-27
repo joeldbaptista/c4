@@ -17,7 +17,8 @@
 // tokens and classes (operators last and in precedence order)
 enum {
 	Num = 128, Fun, Sys, Glo, Loc, Id,
-	Char, Else, Enum, For, If, Int, Return, Sizeof, While,
+	Break, Char, Continue, Else, Enum, For, If, Int, Return,
+	Sizeof, While,
 	Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge,
 	Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
 };
@@ -40,6 +41,8 @@ char *p, *lp;   // current position in source code
 char *data;     // data/bss pointer
 
 int *e, *le;    // current position in emitted code
+int *brks;      // chain of break jumps awaiting the loop exit
+int *cont;      // where continue jumps to, 0 when not in a loop
 int *id;        // currently parsed identifier
 int *sym;       // symbol table (simple list of identifiers)
 int tk;         // current token
@@ -646,7 +649,9 @@ expr(int lev)
 void
 stmt()
 {
-	int *a, *b, *c, *d;
+	int *a, *b, *c, *d;    // patch sites for this statement
+	int *t;                // walks the break chain
+	int *ob, *oc;          // enclosing loop's break and continue
 
 	if (tk == If) {
 		next();
@@ -675,8 +680,12 @@ stmt()
 		}
 		*b = (int)(e + 1);
 	} else if (tk == While) {
+		ob = brks;
+		oc = cont;
+		brks = 0;
 		next();
 		a = e + 1;
+		cont = a;
 		if (tk == '(') {
 			next();
 		} else {
@@ -696,11 +705,21 @@ stmt()
 		*++e = JMP;
 		*++e = (int)a;
 		*b = (int)(e + 1);
+		while (brks) {
+			t = (int *)*brks;
+			*brks = (int)(e + 1);
+			brks = t;
+		}
+		brks = ob;
+		cont = oc;
 	} else if (tk == For) {
 		// The increment must run after the body, but it is parsed
 		// before it, and code is emitted as it is parsed. So the
 		// condition falls through to a jump across the increment,
 		// and the body jumps back to it.
+		ob = brks;
+		oc = cont;
+		brks = 0;
 		next();
 		if (tk == '(') {
 			next();
@@ -732,6 +751,7 @@ stmt()
 		*++e = JMP;
 		c = ++e;
 		d = e + 1;
+		cont = d;
 		if (tk != ')')
 			expr(Assign);
 		*++e = JMP;
@@ -748,6 +768,45 @@ stmt()
 		*++e = (int)d;
 		if (b)
 			*b = (int)(e + 1);
+		while (brks) {
+			t = (int *)*brks;
+			*brks = (int)(e + 1);
+			brks = t;
+		}
+		brks = ob;
+		cont = oc;
+	} else if (tk == Break) {
+		// The exit address is unknown until the loop ends, so
+		// every break is threaded onto a chain held in the jump
+		// operands themselves, and patched when the loop closes.
+		next();
+		if (!cont) {
+			printf("%d: break outside of loop\n", line);
+			exit(-1);
+		}
+		*++e = JMP;
+		*++e = (int)brks;
+		brks = e;
+		if (tk == ';') {
+			next();
+		} else {
+			printf("%d: semicolon expected\n", line);
+			exit(-1);
+		}
+	} else if (tk == Continue) {
+		next();
+		if (!cont) {
+			printf("%d: continue outside of loop\n", line);
+			exit(-1);
+		}
+		*++e = JMP;
+		*++e = (int)cont;
+		if (tk == ';') {
+			next();
+		} else {
+			printf("%d: semicolon expected\n", line);
+			exit(-1);
+		}
 	} else if (tk == Return) {
 		next();
 		if (tk != ';')
@@ -828,11 +887,12 @@ main(int argc, char **argv)
 	memset(e, 0, poolsz);
 	memset(data, 0, poolsz);
 
-	p = "char else enum for if int return sizeof while "
+	p = "break char continue else enum for if int return sizeof "
+	    "while "
 	    "open read close printf malloc free memset memcmp exit void main";
 
 	// add keywords to symbol table
-	i = Char;
+	i = Break;
 	while (i <= While) {
 		next();
 		id[Tk] = i++;
